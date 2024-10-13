@@ -1,0 +1,65 @@
+/**
+ * lab6_template_extra_help.c
+ *
+ * Description: This is file is meant for those that would like a little
+ *              extra help with formatting their code.
+ *
+ */
+
+#define _RESET 1
+#define BUFFER_SIZE 20
+#define _PART2 0
+#define _PART3 0
+
+#include "timer.h"
+#include "lcd.h"
+#include "uart.h"
+
+#if _RESET
+#include "Simulation_User Files_resetSimulation.h"
+#endif
+
+// Adding global volatile varibles for communcating between
+// your Interupt Service Routine, and your non-interupt code.
+
+volatile  char uart_data;  // Your UART interupt code can place read data here
+volatile  char flag;       // Your UART interupt can update this flag
+                           // to indicate that it has placed new data
+                           // in uart_data
+
+
+int main(void)
+{
+    char buffer[BUFFER_SIZE]; // Buffer to store received characters
+    int count = 0;            // Character counter
+
+    // Step 1: Initialize UART and LCD
+    uart_init(115200);   // Initialize UART with baud rate 115200
+    lcd_init();          // Initialize the LCD display
+    timer_init();        // Timer initialization (if used for delays)
+
+    lcd_printf("UART Test");  // Display an initial message to indicate the program is running
+
+    while (1)
+    {
+        // Step 2: Wait for a character to be received via UART
+        char received = uart_receive(); // Read character from UART
+
+        // Step 3: Handle the received character
+        if (received == '\r' || count == BUFFER_SIZE) // If 'Enter' key or buffer is full
+        {
+            buffer[count] = '\0';  // Null-terminate the string
+            lcd_clear();           // Clear the LCD display
+            lcd_printf("%s", buffer); // Print entire buffered string on LCD line 1
+            count = 0;             // Reset the character counter for the next input
+        }
+        else
+        {
+            // Store the character in the buffer and display it on LCD line 1
+            buffer[count++] = received;  // Add the received character to the buffer
+            lcd_printf("Char: %c\nCount: %d", received, count); // Display character and count
+        }
+    }
+
+    return 0;
+}

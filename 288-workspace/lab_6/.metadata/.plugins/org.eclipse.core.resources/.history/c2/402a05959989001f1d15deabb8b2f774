@@ -1,0 +1,99 @@
+/**
+ * lab6_template_extra_help.c
+ *
+ * Description: This is file is meant for those that would like a little
+ *              extra help with formatting their code.
+ *
+ */
+
+#define _RESET 0
+#define _PART1 1
+#define _PART2 0
+#define _PART3 0
+#define BUFFER_SIZE 20
+
+#include "timer.h"
+#include "lcd.h"
+#include "uart.h"
+
+
+
+
+
+volatile  char uart_data;
+volatile  char flag;
+
+
+
+
+int main(void)
+{
+    uart_init(115200);
+    lcd_init();
+    timer_init();
+
+#if _PART1
+    // Part 1: Receive and display text on LCD
+    lcd_printf("UART Part 1 Test");
+
+    char buffer[20]; // Buffer to store received characters
+    int count = 0;   // Character counter
+
+    while (1)
+    {
+        char received = uart_receive(); // Read character from UART
+
+        if (received == '\r' || count == 20) // If 'Enter' key or buffer is full
+        {
+            buffer[count] = '\0';  // Null-terminate the string
+            lcd_clear();           // Clear the LCD display
+            lcd_printf("%s", buffer); // Print entire buffered string on LCD line 1
+            count = 0;             // Reset the character counter for the next input
+        }
+        else
+        {
+            buffer[count++] = received;  // Add the received character to the buffer
+            lcd_printf("Char: %c\nCount: %d", received, count); // Display character and count
+        }
+    }
+
+#elif _PART2
+    // Part 2: Echo received characters back to PuTTY
+    lcd_printf("UART Echo Test");
+
+    while (1)
+    {
+        char received = uart_receive(); // Read character from UART
+        uart_sendChar(received);        // Echo the received character back to PuTTY
+
+        if (received == '\r') // Add line feed after carriage return to maintain new line in PuTTY
+        {
+            uart_sendChar('\n');
+        }
+
+        // Display on LCD for debugging purposes
+        lcd_printf("Received: %c", received);
+    }
+
+#elif _PART3
+    // Part 3: UART using interrupts (not implemented in this version, placeholder)
+    lcd_printf("UART Interrupt Test");
+
+    // Set up interrupts here (using uart_interrupt_init())
+    uart_interrupt_init();
+
+    // Infinite loop to handle incoming data using interrupts
+    while (1)
+    {
+        if (flag == 1) // If new data is available (flag set by ISR)
+        {
+            flag = 0; // Reset the flag
+            lcd_printf("Received: %c", uart_data); // Display the received data on the LCD
+            uart_sendChar(uart_data); // Echo the data back to PuTTY
+        }
+    }
+
+#endif
+
+    return 0;
+}

@@ -1,0 +1,58 @@
+/**
+ * lab6_template_extra_help.c
+ *
+ * Description: This is file is meant for those that would like a little
+ *              extra help with formatting their code.
+ *
+ */
+
+#define _RESET 1
+#define BUFFER_SIZE 20
+#define _PART2 0
+#define _PART3 0
+
+#include "timer.h"
+#include "lcd.h"
+#include "uart.h"
+
+
+
+
+
+volatile  char uart_data;
+volatile  char flag;
+
+
+
+
+int main(void)
+{
+    char buffer[BUFFER_SIZE];
+    int count = 0;
+
+    uart_init(115200);
+    lcd_init();
+    timer_init();
+
+    lcd_printf("UART Test");
+
+    while (1)
+    {
+        char received = uart_receive();
+
+        if (received == '\r' || count == BUFFER_SIZE)
+        {
+            buffer[count] = '\0';
+            lcd_clear();
+            lcd_printf("%s", buffer);
+            count = 0;
+        }
+        else
+        {
+            buffer[count++] = received;
+            lcd_printf("Char: %c\nCount: %d", received, count);
+        }
+    }
+
+    return 0;
+}
