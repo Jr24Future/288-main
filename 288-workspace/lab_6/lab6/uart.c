@@ -58,24 +58,18 @@ void uart_sendStr(const char *data)
 void uart_interrupt_init()
 {
     // Enable interrupts for receiving bytes through UART1
-    UART1_IM_R |= 0x10;   // Enable interrupt on receive - page 924 (RXIM)
-
-    // Find the NVIC enable register and bit responsible for UART1
-    NVIC_EN0_R |= (1 << 6); // Enable UART1 interrupts (Interrupt 22 is in bit 6 of NVIC_EN0) - page 104
-
-    // Register the interrupt handler (if not using TivaWare driverlib)
-    IntRegister(INT_UART1, uart_interrupt_handler);  // Give the microcontroller the address of our interrupt handler
+    UART1_IM_R |= 0x10;  // Enable interrupt on receive
+        NVIC_EN0_R |= 0x40;  // Enable UART1 interrupt in NVIC (bit 6 for UART1)
+        IntRegister(INT_UART1, uart_interrupt_handler);  // Register your interrupt handler
+        IntMasterEnable();  // Enable global interrupts
 }
 
 void uart_interrupt_handler()
 {
     // Check the Masked Interrupt Status
-    if (UART1_MIS_R & 0x10) // If RX interrupt
-    {
-        uart_data = (char)(UART1_DR_R & 0xFF); // Read received data
-        flag = 1;  // Set flag indicating new data has been received
-
-        // Clear the interrupt
-        UART1_ICR_R |= 0x10;  // Clear RX interrupt - page 924
-    }
+    if (UART1_MIS_R & 0x10) {  // Check if receive interrupt occurred
+            uart_data = (char)(UART1_DR_R & 0xFF);  // Read the received character
+            flag = 1;  // Set flag to indicate new data has been received
+            UART1_ICR_R |= 0x10;  // Clear the interrupt
+        }
 }
