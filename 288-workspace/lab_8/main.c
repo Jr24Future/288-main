@@ -118,8 +118,8 @@ void perform_180_ir_scan(cyBOT_Scan_t *scanData) {
         cyBOT_Scan(angle, scanData);  // Scan at the specified angle
         int ir_distance = adc_distance(); // Convert raw IR to distance
 
-        char message[50];
-        snprintf(message, sizeof(message), "Angle: %d\tIR Distance: %d cm\n", angle, ir_distance);
+        char message[20];
+        snprintf(message, sizeof(message), "%d,%d;", angle, ir_distance);
         uart_sendStr(message);
 
         // Detect objects based on IR distance
@@ -136,7 +136,7 @@ void perform_180_ir_scan(cyBOT_Scan_t *scanData) {
             object_count++;
         }
     }
-
+    uart_sendStr("\n");
     // Display start and end angles of each detected object
     uart_sendStr("\nDetected Objects:\n");
     uart_sendStr("Object\tStart Angle\tEnd Angle\n");
@@ -146,6 +146,7 @@ void perform_180_ir_scan(cyBOT_Scan_t *scanData) {
         snprintf(message, sizeof(message), "Object %d\t%d\t\t%d\n", i + 1, detected_objects[i].start_angle, detected_objects[i].end_angle);
         uart_sendStr(message);
     }
+    uart_sendStr("\n");
 }
 
 void display_smallest_object() {
@@ -243,84 +244,60 @@ void handle_bump_sensor(oi_t *sensor_data) {
     }
 }
 
-int main(void) {
+void handle_uart_data(char command, oi_t *sensor_data, cyBOT_Scan_t *scanData) {
+    switch (command) {
+        case 'w': case 'a': case 's': case 'd':
+            control_movement(sensor_data, command);
+            uart_sendStr("Movement command executed.\n");
+            break;
+        case 't':
+            if (current_mode == MANUAL) {
+                current_mode = AUTONOMOUS_SCAN;
+                uart_sendStr("Switched to Autonomous Mode. Press 'h' to start scanning.\n");
+            } else {
+                current_mode = MANUAL;
+                uart_sendStr("Switched to Manual Mode.\n");
+            }
+            break;
+        case 'h':
+            if (current_mode == AUTONOMOUS_SCAN) {
+                perform_180_ir_scan(scanData);
+                display_smallest_object();
+                uart_sendStr("Press 'h' again to move towards the smallest object.\n");
+                current_mode = AUTONOMOUS_TURN;
+            } else if (current_mode == AUTONOMOUS_TURN || current_mode == AUTONOMOUS_MOVE) {
+                navigate_to_smallest_object(scanData, sensor_data, 0);  // Assume the smallest object for now
+            }
+            break;
+        case 'q':
+            uart_sendStr("Disconnecting from Client.\n");
+            break;
+        default:
+            uart_sendStr("Invalid command received.\n");
+            break;
+    }
+}
 
+int main(void) {
     setup();
 
     cyBOT_Scan_t scanData;
     oi_t *sensor_data = oi_alloc();
     oi_init(sensor_data);
-    int i;
 
-    uart_sendStr("Press 't' to toggle modes (Manual/Autonomous), 'h' to proceed in autonomous mode, or 'q' to quit.\n");
-
-    int smallest_index = -1;  // Initialize smallest index to -1 for autonomous mode
+    uart_sendStr("Ready for commands.\n");
 
     while (1) {
-        // Read bump sensor status and handle bumps if any
-        oi_update(sensor_data);
-        if (sensor_data->bumpLeft || sensor_data->bumpRight) {
-            // Handle bump sensor activation and stop autonomous actions
-            if (sensor_data->bumpLeft) {
-                handle_bump(sensor_data, 'L');
-            } else if (sensor_data->bumpRight) {
-                handle_bump(sensor_data, 'R');
-            }
-            continue; // Skip the rest of the loop to handle the bump properly and prompt the user
-        }
+        oi_update(sensor_data);  // Regularly update the sensor data
+
+        handle_bump_sensor(sensor_data);  // Handle any bump sensor activation
 
         if (flag) {
-            flag = 0;
-
-            if (uart_data == 't') {
-                if (current_mode == MANUAL) {
-                    current_mode = AUTONOMOUS_SCAN;
-                    uart_sendStr("Switched to Autonomous Mode. Press 'h' to start scanning and moving.\n");
-                } else {
-                    current_mode = MANUAL;
-                    uart_sendStr("Switched to Manual Mode. Use 'w', 'a', 's', 'd' to control the CyBot.\n");
-                }
-            } else if (current_mode == MANUAL) {
-                control_movement(sensor_data, uart_data);
-            } else if (current_mode == AUTONOMOUS_SCAN && uart_data == 'h') {
-                lcd_clear();
-                lcd_printf("Performing Scan...");
-                object_count = 0;
-
-                perform_180_ir_scan(&scanData);
-                //                refine_object_detection_with_ping(&scanData);
-
-                if (object_count > 0) {
-                    // Find the smallest object
-                    smallest_index = 0;
-                    float smallest_width = detected_objects[0].end_angle - detected_objects[0].start_angle;
-
-                    for (i = 1; i < object_count; i++) {
-                        float width = detected_objects[i].end_angle - detected_objects[i].start_angle;
-                        if (width < smallest_width) {
-                            smallest_width = width;
-                            smallest_index = i;
-                        }
-                    }
-
-                    display_smallest_object();
-
-                    uart_sendStr("\nPress 'h' again to move towards the smallest object.\n");
-                    current_mode = AUTONOMOUS_TURN;
-                } else {
-                    uart_sendStr("No objects detected. Press 'h' to scan again.\n");
-                }
-            } else if ((current_mode == AUTONOMOUS_TURN || current_mode == AUTONOMOUS_MOVE) && uart_data == 'h') {
-                navigate_to_smallest_object(&scanData, sensor_data, smallest_index);
-            } else if (uart_data == 'q') {
-                uart_sendStr("Quitting the application.\n");
-                oi_free(sensor_data);
-                break;
-            } else {
-                uart_sendStr("Invalid command. Press 't' to toggle modes, 'h' to proceed, or 'q' to quit.\n");
-            }
+            flag = 0;  // Reset flag after processing
+            handle_uart_data(uart_data, sensor_data, &scanData);
         }
     }
-    return 0;
 
+    oi_free(sensor_data);
+    return 0;
 }
